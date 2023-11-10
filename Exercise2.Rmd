@@ -450,7 +450,7 @@ library(ggplot2)
 p <- ggpairs(learning2014, mapping = aes(), lower = list(combo = wrap("facethist", bins = 20)))
 
 # draw the plot
-
+p
 
 
 ```
@@ -495,7 +495,7 @@ qplot(attitude, points, data = learning2014) + geom_smooth(method = "lm")
 my_model <- lm(points ~ 1, data = learning2014)
 
 # print out a summary of the model
-
+my_model
 
 ```
 
@@ -591,7 +591,7 @@ Hint:
 my_model2 <- lm(points ~ attitude + stra, data = learning2014)
 
 # draw diagnostic plots using the plot() function. Choose the plots 1, 2 and 5
-
+plot(my_model2, which=c(1,2,5))
 
 ```
 

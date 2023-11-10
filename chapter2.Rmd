@@ -51,8 +51,53 @@ Overall, the number of female students who participated in the course is almost 
 
 Regarding the correlations between the different variables, the results differ quite a bit depending on the gender. For instance, interestingly, the values from surface learning questions seemed to correlate negatively with both attitude and deep learning questions, but these correlations seem to be very specific to the male participants. Moreover, age seemed to have quite minimal correlations with any of the other variables, yet the points of male participants seemed to be negatively correlated with exam points. However, no conrete conclusions can be made due to the evident low number of male students of higher age. Most notably, attitude seems to have the highest positive correlation with exam points regardless of the gender.
 
+### 3.Fitting regression models
+
+To explore further which variables seem to associate with the exam points variable, a regression model is fitted to the data with three explanatory variables. I chose attitude, stra and surf as the three explanatory variables since they seem to have the highest absolute correlation values with the exam points based on the summary plot above.
+
+```{r}
+# creating a regression model with multiple explanatory variables: for exam points attitude, stra and surf 
+my_model2 <- lm(points ~ attitude + stra + surf, data = data)
+# printing out a summary of the model
+summary(my_model2)
+```
+The model is essentially describing how well the combination of attitude, stra and surf variables predict the outcome variable, exam points. The coefficients table 
+
+Based on the results, the p-value for the whole model seems to be significant at 3.156e-08, yet a p-value for each of the explanatory variable of interest is provided as well in the last column of the Coefficients table
+
+The residuals essentially describe the difference between the actual observed response values and the values estimated by the model, including the minimal and maximal differences, 1st and 3rd quartile values, and the median difference, which is about 0.5 in this case.
+
+ A p-value is provided ( 
+
+ ), which is the result of a null hypothesis significance test for the slope of the line being equal to zero.
+ 
+ https://feliperego.github.io/blog/2015/10/23/Interpreting-Model-Output-In-R
+
+```{r}
+# create a regression model with multiple explanatory variables
+my_model2 <- lm(points ~ attitude + stra, data = data)
+
+summary(my_model2)
+```
+
+```{r}
+# create a regression model with multiple explanatory variables
+my_model2 <- lm(points ~ attitude, data = data)
+summary(my_model2)
+```
+
+```{r message=FALSE}
+qplot(attitude, points, data = data) + geom_smooth(method = "lm")
+```
+
 3 Choose three variables as explanatory variables and fit a regression model where exam points is the target (dependent, outcome) variable. Show a summary of the fitted model and comment and interpret the results. Explain and interpret the statistical test related to the model parameters. If an explanatory variable in your model does not have a statistically significant relationship with the target variable, remove the variable from the model and fit the model again without it. (0-4 points)
 
 4 Using a summary of your fitted model, explain the relationship between the chosen explanatory variables and the target variable (interpret the model parameters). Explain and interpret the multiple R-squared of the model. (0-3 points)
 
 5 Produce the following diagnostic plots: Residuals vs Fitted values, Normal QQ-plot and Residuals vs Leverage. Explain the assumptions of the model and interpret the validity of those assumptions based on the diagnostic plots. (0-3 points)
+
+```{r}
+plot(my_model2, which=c(1,2,5))
+```
+
+
