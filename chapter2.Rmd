@@ -1,10 +1,4 @@
-# Regression analysis
-
-*Describe the work you have done this week and summarize your learning.*
-
--   Describe your work and results clearly.
--   Assume the reader has an introductory course level understanding of writing and reading R code as well as statistical methods.
--   Assume the reader has no previous knowledge of your data or the more advanced methods you are using.
+# 2. Regression analysis
 
 ```{r}
 date()
@@ -12,14 +6,14 @@ date()
 
 ### Loading necessary R packages
 
-```{r}
+```{r message=FALSE}
 library(dplyr)
 library(readr)
 library(ggplot2)
 library(GGally)
 ```
 
-### 1. Learning 2014 dataset
+### 2.1 Learning 2014 dataset
 
 ```{r}
 # reading in the learning 2014 dataset and saving it as a data frame in a variable called "data"
@@ -37,7 +31,7 @@ str(data)
 
 The original learning 2014 dataset was collected by Kimmo Vehkalahti in 2014-2015, which includes answers from 183 students to a variety of questions related to their learning and studying habits, as well as teaching on a course named Introduction to Social Statistics. The original dataset contained 60 variables and 183 observations (students), while the current dataset was processed using the original one and it includes 166 observations, and seven variables based on the dimensions and structure visible above. Checking the structure further reveals that the included variables are gender, age, attitude, deep, stra, surf, and points. While age and gender columns may be easy to understand, the rest of the variables may require a bit of clarification: attitude variable describes the global attitude towards statistics, deep variable is the average value from 12 questions related to deep learning, stra variable is the the average value from 8 questions related to strategic learning, surf variable is the the average value from 12 questions related to surface learning, and points refers to exam points. The deep, strategic and surface learning questions were all measured on the Likert scale (1-5, 1 = strongly disagree, 2 = disagree, 3 = neutral, 4 = agree, 5= strongly agree).
 
-### 2. Graphical overview of the data
+### 2.2 Graphical overview of the data
 
 ```{r message=FALSE}
 # printing a graphical overview of the data, coloring the distributions by gender
@@ -51,7 +45,7 @@ Overall, the number of female students who participated in the course is almost 
 
 Regarding the correlations between the different variables, the results differ quite a bit depending on the gender. For instance, interestingly, the values from surface learning questions seemed to correlate negatively with both attitude and deep learning questions, but these correlations seem to be very specific to the male participants. Moreover, age seemed to have quite minimal correlations with any of the other variables, yet the points of male participants seemed to be negatively correlated with exam points. However, no conrete conclusions can be made due to the evident low number of male students of higher age. Most notably, attitude seems to have the highest positive correlation with exam points regardless of the gender.
 
-### 3.Fitting regression models
+### 2.3 Fitting regression models and interpreting the results
 
 To explore further which variables seem to associate with the exam points variable, a regression model is fitted to the data with three explanatory variables. I chose attitude, stra and surf as the three explanatory variables since they seem to have the highest absolute correlation values with the exam points based on the summary plot above.
 
@@ -61,27 +55,24 @@ my_model2 <- lm(points ~ attitude + stra + surf, data = data)
 # printing out a summary of the model
 summary(my_model2)
 ```
-The model is essentially describing how well the combination of attitude, stra and surf variables predict the outcome variable, exam points. The coefficients table 
 
-Based on the results, the p-value for the whole model seems to be significant at 3.156e-08, yet a p-value for each of the explanatory variable of interest is provided as well in the last column of the Coefficients table
+The model is essentially describing how well the combination of attitude, stra and surf variables predict the outcome variable, exam points. In the printed summary above, we first have the description of residuals which essentially describe the difference between the actual observed values and the values estimated by the model, including the minimal and maximal differences, 1st and 3rd quantile values, and the median difference, which is about 0.5 in this case, so quite close to zero, which is good since the residuals seem to be quite symmetrical.
 
-The residuals essentially describe the difference between the actual observed response values and the values estimated by the model, including the minimal and maximal differences, 1st and 3rd quartile values, and the median difference, which is about 0.5 in this case.
+The coefficients table, in turn, describes the coefficients of the model which are basically two unknown constants of the linear model, intercept and slope. So essentially based on these calculated terms and the explanatory variables, we could estimate the outcome variable, i.e., exam points. The p-values are visible in the last column, and they essentially describe the results from a significance test testing the null hypothesis that either the intercept or the slope is 0. The first row in the coefficients table describes the intercept variable, essentially describing the estimated exam points if the values for the explanatory variables would be the average ones in the dataset. For the intercept, we reach a p-value of 0.00322 which is significant. In addition, in the table we have the standard error and t-value columns, which values are related since t value is the coefficient divided by standard error. Standard error essentially captures standard deviation, and we would like that to be as small as possible compared to the coefficient since it describes the level of uncertainty of the coefficient. In contrast, for a confident model, we would like to see a t-value as large as possible since a large t-value would indicate that the standard error is small in comparison to the coefficient. Here, the standard error seems to be relatively high, about 3.7 compared to our coefficient of about 11, and therefore the t-value also remains smaller than 3.
 
- A p-value is provided ( 
-
- ), which is the result of a null hypothesis significance test for the slope of the line being equal to zero.
- 
- https://feliperego.github.io/blog/2015/10/23/Interpreting-Model-Output-In-R
+Since we have multiple explanatory variables, we have also a row for each of them describing the slope constant estimates based on each, as well as standard errors, t-values and p-values for each of these. We can see that the surf parameter (surface learning) is the only one with seemingly negative correlation with exam points (negative slope), and for it we have highest standard error as well as the smallest t-value, while accordingly the p-value for it is nearly 0.5, meaning that the any relationship between it and exam points has an almost 50% chance of arising just by chance. Therefore, I chose to fit the model again without the surf variable.
 
 ```{r}
-# create a regression model with multiple explanatory variables
+# creating a regression model with multiple explanatory variables: for exam points attitude and stra
 my_model2 <- lm(points ~ attitude + stra, data = data)
 
 summary(my_model2)
 ```
 
+Based on the output, we can see that the p-value for the whole model is now 0.00025, so more significant than for the previous model, yet the p-value for the stra explanatory variable remains non-significant at 0.089 so therefore I will fit the model again without it.
+
 ```{r}
-# create a regression model with multiple explanatory variables
+# creating a regression model with one explanatory variable, attitude, for exam points
 my_model2 <- lm(points ~ attitude, data = data)
 summary(my_model2)
 ```
@@ -90,14 +81,32 @@ summary(my_model2)
 qplot(attitude, points, data = data) + geom_smooth(method = "lm")
 ```
 
-3 Choose three variables as explanatory variables and fit a regression model where exam points is the target (dependent, outcome) variable. Show a summary of the fitted model and comment and interpret the results. Explain and interpret the statistical test related to the model parameters. If an explanatory variable in your model does not have a statistically significant relationship with the target variable, remove the variable from the model and fit the model again without it. (0-4 points)
+Now we can observe from the summary, that the model has further improved and reached a much more significant p-value for the intercept at 1.95e-09 and for the slope the p-value is almost as significant at 4.12e-09. Moreover, the standard error is now smaller and t-value has also improved as it is over 6 for both intercept and slope.
 
-4 Using a summary of your fitted model, explain the relationship between the chosen explanatory variables and the target variable (interpret the model parameters). Explain and interpret the multiple R-squared of the model. (0-3 points)
+Also, I plotted a scatterplot above to further describe the relationship of the two variables, the blue line capturing the estimated regression model. We can see that higher the score on the attitude scale, i.e., the explanatory variable, seems to positively correlate with the exam points, i.e., the outcome variable. This positive correlation can also be seen in the summary since the slope constant for the model is > .
 
-5 Produce the following diagnostic plots: Residuals vs Fitted values, Normal QQ-plot and Residuals vs Leverage. Explain the assumptions of the model and interpret the validity of those assumptions based on the diagnostic plots. (0-3 points)
+Moreover, from the summary we can check the residual standard error which describes the quality of the fit, and basically this value describes the error term that every linear model is expected to contain. For the present model, it seems to be 5.32, resulting in about 46% percentage error. The degrees of freedom describe the data points used in the model fit, here 164. The F statistic, in turn, is a good indicator of whether there is a relationship between the predictor and response variables, and the following p-value is derived essentially from a test where the null hypothesis is that there is no relationship. The F statistic has steadily gotten bigger and p-value smaller when removing the surf and stra explanatory variables, so the model has improved. Since we have a relatively big dataset, we can at least reject the null hypothesis, i.e., that there is no relationship between the variables, for all the models, and most confidently for the last model only including attitude as an explanatory variable.
+
+The R-squared statistic in the model describes how well the model fits the actual observed data, essentially depicting the proportion of variance and measuring the linear relationship between the predictor variable, attitude, and target variable, exam points. Basically in the present model, roughly 19% of the variance of the exam points variable can be explained by the attitude score.
+
+### 2.4 Diagnostic plots
+
+The linear regression model includes some assumptions about the data, so next we will plot a few diagnostics plots to interpret if those assumptions apply to the present dataset.
 
 ```{r}
+# generating selected diagnostic plots: Residuals vs Fitted values, Normal QQ-plot and Residuals vs Leverage
 plot(my_model2, which=c(1,2,5))
 ```
 
+The linear model assumes a linear relationship between the explanatory and outcome variables, and this assumption can be checked from the residuals vs fitted plot. There seems to be a linear horizontal line without distinct patterns, so indeed the assumption of a linear relationship seems to apply here.
+
+Secondly, the residual errors are assumed to be normally distributed, which assumption can be evaluated based on the normal Q-Q plot. The residuals points should follow the straight dashed line, which seems to apply here relatively well at least for majority of values. However, some discrepancy can be seen for very small and high values, which is quite normal, though.
+
+Furthermore, the model assumes that residuals have a constant variance, and hence we would like to check that there are no cases in the dataset that have extreme values that might highly affect the regression results if excluded/included. This can be evaluated based on the residuals vs leverage plot, in which the 3 most extreme points are highlighted. We have a few cases which seem to exceed 3 standard deviations which represent potential outliers, and it might be useful to test the model fit without these.
+
+Based on these observations, it can be concluded that the model assumptions apply relatively well to the present dataset.
+
+### 2.5 Summary
+
+In summary, we can confidently say that there seems to be a relationship between the attitude and exam variables since we get a very significant p-value for the model. However, the p-value should not to be interpreted in such a way that the estimation of exam points would be highly confident if we know the attitude score, since we have to acknowledge that only less than 20% of the variability of the exam points variable is explained by the attitude. 
 
