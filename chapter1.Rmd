@@ -1,8 +1,6 @@
-# About the project
+# 1. About the project
 
-*Write a short description about the course and add a link to your GitHub repository here. This is an R Markdown (.Rmd) file so you should use R Markdown syntax.*
-
-I' excited for this course since I think I already learned a bunch of new things at the installation/setup phase, although I use these key tools of the course, **R (studio) and GitHub**, already on a *daily basis*. Since I'm very much **self-learned**, it will be intriguing to learn new things about these tools and how to use them in a more sensible manner perhaps. Especially learning more about *the crosstalk between R (studio) and GitHub* will be very useful for me, while I'm also excited to dive into the other contents of the course.
+I'm excited for this course since I think I already learned a bunch of new things at the installation/setup phase, although I use these key tools of the course, **R (studio) and GitHub**, already on a *daily basis*. Since I'm very much **self-learned**, it will be intriguing to learn new things about these tools and how to use them in a more sensible manner perhaps. Especially learning more about *the crosstalk between R (studio) and GitHub* will be very useful for me, while I'm also excited to dive into the other contents of the course.
 
 To be honest, I didn't go over the R for Health Data Science in detail *yet*, just merely browsed but I think it will be a great source of information regarding the later parts of the course. I'm quite familiar with R basics and plotting in R (often with ggplot2), but to be honest, I rarely use other tidyverse -related packages like dplyr anymore since I'm pretty much self-learned R user and usually I find other ways to execute things which I find to be more intuitive than the dplyr commands. But maybe I'll be converted to a fan after the course, who knows!
 
@@ -15,4 +13,3 @@ date()
 
 ```
 
-The text continues here.
