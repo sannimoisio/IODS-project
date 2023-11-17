@@ -6,7 +6,7 @@ date()
 
 ### Loading necessary R packages
 
-```{r cars}
+```{r}
 library(boot)
 library(readr)
 library(dplyr)
