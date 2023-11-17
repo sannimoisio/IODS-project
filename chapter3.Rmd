@@ -1,0 +1,159 @@
+# 3. Logistic regression
+
+```{r}
+date()
+```
+
+### Loading necessary R packages
+
+```{r cars}
+library(boot)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+```
+
+### 3.1 Alcocol consumption dataset
+
+Reading in the joined student alcohol consumption dataset.
+
+```{r}
+# reading in the dataset
+alc <- read.csv("/Users/sannimoi/Documents/courses/IODS/IODS-project/data/alc.csv")
+# checking the names of the variables, i.e., columns
+colnames(alc)
+```
+
+The current dataset was retreived from <http://www.archive.ics.uci.edu/dataset/320/student+performance> and it contains information about performance of Portuguese secondary education students in two subjects, math and Portuguese. For the present purpose, we have combined the two datasets, and read that modified data in. There are several variables that can be easily understood based on the column name, like school, sex, age, address etc. But especially Dalc and Walc variables are important here, since they describe alcohol consumption on the workdays and weekends, respectively, while alc_use is the mean value of the two and high_use column is set to TRUE if alc_use exceeds 2.
+
+### 3.2 Hypotheses
+
+The purpose of this analysis is to study the relationships between high/low alcohol consumption and some other variables in the data. I have chosen the following variables to study:
+
+-   failures - number of past class failures (numeric: n if 1\<=n\<3, else 4)
+
+-   studytime - weekly study time (numeric: 1 - \<2 hours, 2 - 2 to 5 hours, 3 - 5 to 10 hours, or 4 - \>10 hours)
+
+-   famrel - quality of family relationships (numeric: from 1 - very bad to 5 - excellent)
+
+-   absences - number of school absences (numeric: from 0 to 93)
+
+I hypothesize that weekly study time and and quality of family relationships would negatively correlate with alcohol consumption, i.e., that a higher value for these factors would usually associate with lower alcohol consumption. Regarding the number of school absences and past class failures, I assume the opposite, i.e., that there would be a positive correlation between higher alcohol consumption and higher number of absences/failures.
+
+### 3.3 Variable distributions and relationships
+
+```{r}
+# drawing a bar plot of each chosen variable
+gather(alc[,c("failures", "studytime", "famrel", "absences", "alc_use")]) %>% ggplot(aes(value)) + facet_wrap("key", scales = "free") + geom_bar()
+```
+
+```{r}
+# and then summarizing the number of students that have been classified to the high alcohol usage group
+alc %>% group_by(high_use) %>% summarise(count = n())
+```
+
+In general, based on the plots and table above, we can observe that most students have a reasonable number of absences, only a few standing out with more than 15, and also that vast majority of students haven't failed any classes in the past. Majority of students also fall into the category of low alcohol consumption (high use = FALSE & less than 2 portions based on the barplot) yet still about 30% have been classified into the high alcohol use group. Most students also report good/excellent quality family relationships, while study time per week, in turn, seems to average around 2-5 hours per week, as category 2 stands out as the most common one there, studying less than that being the reality for about 100 students, while less than 100 report studying more than 5 hours.
+
+```{r}
+# creating cross-tabulations describing the numbers in each candidate explanatory variable category and the high/low alcohol usage category
+table(high_use = alc$high_use, prediction = alc$failures)
+table(high_use = alc$high_use, prediction = alc$studytime)
+table(high_use = alc$high_use, prediction = alc$famrel)
+table(high_use = alc$high_use, prediction = alc$absences)
+
+```
+
+```{r figures-side}
+# plotting boxplots to study the relationship between the alcohol usage (high or not) and the chosen variables
+
+# drawing boxplots comparing values between the high vs low alcohol usage groups
+ggplot(alc, aes(x = high_use, y = failures, col=high_use)) + geom_boxplot() + ggtitle("Past class failures") + xlab("High alcohol use")
+ggplot(alc, aes(x = high_use, y = studytime, col=high_use)) + geom_boxplot() + ggtitle("Study time") + xlab("High alcohol use")
+ggplot(alc, aes(x = high_use, y = famrel, col=high_use)) + geom_boxplot() + ggtitle("Quality of family relationships") + xlab("High alcohol use")
+ggplot(alc, aes(x = high_use, y = absences, col=high_use)) + geom_boxplot() + ggtitle("Absences from school") + xlab("High alcohol use")
+
+```
+
+From the tables and plots above, we can get some idea whether the chosen variables seem to have any relationship with the high alcohol consumption. As I assumed, the students reporting high alcohol consumption study less on average based on study time and report family relationships of lower quality on average. Also, as I hypothesized, the number of absences from school seemed to be higher on average in the group with high alcohol use. The relationship of failed classes, however, is difficult to evaluate based on the boxplot, since so few students had previously failed classes, yet some indication of a correlation can be observed from the table, as more students that have 2 or more failed classes also consume high amount of alcohol.
+
+### 3.4 Logistic regression
+
+To statistically explore the relationship between the chosen explanatory variables and the high/low alcohol consumption target variable, a logistic regression model will be fitted.
+
+```{r}
+# fitting the model, using failres, studytime, famrel and absences as the explanatory variables
+model <- glm(high_use ~ failures + studytime + famrel + absences, data = alc, family = "binomial")
+# printing the summary
+summary(model)
+```
+
+```{r}
+# then printing the odds ratios of the coefficients
+exp(coef(model))
+```
+
+```{r}
+# and then printing the confidence intervals for the coefficients 
+confint(model)
+```
+
+Looking at the summary of the logistic regression model, we can interpret the residuals similarly to linear regression, as they essentially describe the difference between the actual observed values and the values estimated by the model, including the minimal and maximal differences, 1st and 3rd quantile values, and the median difference, which is about -0.6253 in this case. Moreover, the coefficients table describes the estimated intercept term and the slope terms for each explanatory variables, while p-values for each are also given. The p-value for the intercept remains quite high at 0.33, while p-values for all the slope terms except famrel are significant. The null deviance describes the value when only taking intercept term into account, while residual deviance is the value when all variables are taken into account, so the higher the difference, better the model. The difference doesn't seem very notable in this case. The AIC, in turn, would be useful in comparing the fit of multiple regression models, as it could help to find the model that explains the most variation in the data, the lower the AIC the better.
+
+The odds ratios can essentially be interpreted as the percentage increase in the odds of an event, so basically anything less than zero have a negative association, so here study time and quality of family relationships, so if they increase, they decrease the odds of high alcohol consumption, while the odds ratios for failures and absences are more than one, and thus if they increase, also increases the probability of high alcohol consumption. Odds ratio of 1 would correspond to 0.5 probability, so e.g., the odds ratio of failures corresponds to 1.632/(1+1.632)=0.62 probability, while study time would correspond to 0.613/(1+0.613)=0.38 probability, essentially meaning how much would the probability of high alcohol consumption increase/decrease if the value of the explanatory variable is increased by one unit. Based on these odds ratios, all of the explanatory variables seem to associate with alcohol consumption as I assumed, studytime and famrel correlating negatively, while failures and absences had positive correlation with alcohol consumption.
+
+The confidence intervals, in turn, describe the range of estimated values for a parameter, and basically here we can state that we can be 95% confident that the slope for each explanatory variable is between the intervals visible above. E.g., it is likely that the slope for failures id between 0.095 and 0.902, which seems to be quite a wide scale, also visible in the p-value for the slope (0.016370), which is higher compared to e.g. absences, although the odds ratio for absences is not so high as for failures. For absences, in turn, the confidence interval is between 0.032 and 0.121, and the p-value is highly significant at 0.000958, which highlights that to explore the relationship between an explanatory and outcome variable, one should check both the odds ratio and the confidence estimates of the relationship between the two variables, like the p-value and confidence intervals.
+
+Since famrel variable, did not have a significant relationship to alcohol consumption, removing that from the model and testing the predictive power of the improved model next.
+
+### 3.5 Exploring the predictive power of the logistic regression model
+
+```{r}
+# since quality of family relationships did not seem to have that significant relationship with alcohol consumption, fitting the model without it
+model2 <- glm(high_use ~ failures + studytime + absences, data = alc, family = "binomial")
+
+# predicting the probability of high_use based on the model
+probabilities <- predict(model2, type = "response")
+
+# adding the predicted probabilities to alc
+alc <- mutate(alc, probability = probabilities)
+
+# using the probabilities to make a prediction of high_use
+# classifying probability > 0.5 as a cutoff for high use
+alc <- mutate(alc, prediction = probability > 0.5)
+
+# generating a 2x2 cross tabulation
+table(high_use = alc$high_use, prediction = alc$prediction)
+```
+
+```{r}
+# calculating for how many students the prediction is wrong
+n_wrong <- 0
+for (i in 1:nrow(alc)) {
+  if (alc$high_use[i]!=alc$prediction[i]) {n_wrong <- (n_wrong+1)}}
+n_wrong
+# since there are 370 students in total, the training error can be calculated n_wrong/370
+n_wrong/370
+```
+
+```{r}
+# then checking how well would random predictions work
+# doing the following steps 100 times to derive an estimate of how well a random classification performs compared to our model
+random_errors <- vector()
+for (j in 1:100) {
+  # sampling the high use column to derive a new randomized column with the same ratio of TRUE/FALSE  values
+  alc["high_use_random"] <- sample(alc$high_use)
+  # then calculating how many wrong predictions we get from this random classification
+  n_wrong <- 0
+  for (i in 1:nrow(alc)) {
+    if (alc$high_use[i]!=alc$high_use_random[i]) {n_wrong <- (n_wrong+1)}}
+  # since there are 370 students in total, the training error can be calculated n_wrong/370
+  random_errors <- append(random_errors, n_wrong/370)
+}
+# then checking the mean, median and range of the error rate of these randomized classifications
+mean(random_errors)
+median(random_errors)
+range(random_errors)
+```
+
+Based on the model, we can say pretty confidently that the chosen variables in the final model, weekly study time, number of past class failures and school absences, seem to have a relationship with the outcome variable, alcohol consumption. However, the predictive power of the model, i.e., predicting alcohol consumption based on the variables, is by no means ideal, since the classification to high/low consumption group fails almost 27% percent of the time (= training error), which is still somewhat better than what you would get by grouping the students by random (on average 42% error rate from 100 randomizations) yet far from something we would call a confident predictive model.
