@@ -1,0 +1,214 @@
+# 4. Clustering and classification
+
+```{r}
+date()
+```
+
+### Loading necessary R packages
+
+```{r message=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(MASS)
+library(corrplot)
+library(GGally)
+```
+
+### 4.1 Boston suburban housing values dataset
+
+```{r}
+# loading in the Bostson data from the MASS dataset
+data("Boston")
+# checking the dimensions and structure
+dim(Boston)
+str(Boston)
+```
+
+The Boston dataset contains information about housing values in the suburbs of Boston, and there are in total 506 observations (rows in the data frame) and 14 variables (columns in the data frame), most of the variables being reported in numerical values. These variables include various pieces of information about the studied suburbs, like the per capita crime rate (crim), average number of rooms per dwelling (rm), median value of owner-occupied homes in \$1000s (medv) etc. All the variables are explained [here](https://stat.ethz.ch/R-manual/R-devel/library/MASS/html/Boston.html).
+
+### 4.2 Graphical overview of the data
+
+```{r message=FALSE}
+# for plotting purposes, changing the chas variable into TRUE/FALSE scale
+# 1 -> TRUE (i.e., suburb tract bounds river)
+# 0 -> FALSE (i.e., suburb tract does not bound river)
+Boston2 <- gsub(1, "TRUE", Boston[,4])
+Boston2 <- gsub(0, "FALSE", Boston2)
+Boston["chas"] <- Boston2
+
+# printing out the data summary
+summary(Boston)
+# printing a graphical overview of the data
+ggpairs(Boston, lower = list(continuous = wrap("points", alpha = 0.3, size=0.1), combo = wrap("dot", alpha = 0.3, size=0.1)), upper=list(continuous=wrap("cor", size=2.1))) + theme(axis.text=element_text(size=5), axis.title = element_text(size=5))
+```
+
+In the overview above, we can see that some variable distributions, like crim (per capita crime rate by town), zn (proportion of residential land zoned for lots over 25,000 sq.ft.), and dis (weighted mean of distances to five Boston employment centres) are highly skewed to the left, while some variables, like indus (proportion of non-retail business acres per town) and tax (full-value property-tax rate per \$10,000) seem to have two distinct peaks. Some variables, like rm (average number of rooms per dwelling) seem to be more normally distributed. These observations seem reasonable, since it is quite expected that e.g., only a small minority of residential lots would be very large in a big city like Boston (skewness of the zn variable), while it is more likely that proportion of non-retail business acres per town would be quite town specific and those towns with a lot of industrial buildings, for instance, would have minor residential buildings and vice versa (two peaks of the indus variable). Moreover, it is expected that variables like average number of rooms per dwelling would be quite normally distributed since extremes (very low or high number of rooms) are unreasonable for majority of residents, while the numbers closer to the average accumulate as the peak. Regarding the only non-numerical chas variable, describing if the suburb tract bounds river or not, the vast majority of suburbs do not seem to be river-bound, which is quite expected.
+
+Regarding the relationships between the variables, it seems that all of the numerical variables highly correlate with each other, the strongest association being the positive correlation between tax (full-value property-tax rate per \$10,000) and rad (index of accessibility to radial highways), which seems intuitive that the properties closest to the highways have the highest tax rate. Regarding the only non-numerical variable, chas, describing if the suburb tract bounds river or not, there are no direct correlation values but some trends can be distinguished from the plots, e.g., that there seem to be less suburbs with higher crime rate while the age of the properties seem to be on average higher compared to non-river bound counterparts, which observations seem intuitive since the suburbs closest to the river represent most likely the (historical) downtown of the city with high-value homes.
+
+Plotting below also a visualization of the correlation matrix to allow for a bit closer review of the correlations between the variables.
+
+```{r}
+# changing the chas variable back to original 1/0 values
+# TRUE -> 1 (i.e., suburb tract bounds river)
+# FALSE -> 0 (i.e., suburb tract does not bound river)
+Boston2 <- gsub("TRUE", 1, Boston[,4])
+Boston2 <- gsub("FALSE", 0, Boston2)
+Boston["chas"] <- as.numeric(Boston2)
+
+# calculating the correlation matrix
+cor_matrix <- cor(Boston) 
+# and visualizing it
+corrplot(cor_matrix, method="circle")
+```
+
+In the correlation matrix visualizations we can distinguish the highest correlations between the variables in the dataset, the positive ones being visualized in blue and negative correlations in red. For instance, nox (nitrogen oxides concentration) correlates negatively with dis (weighted mean of distances to five Boston employment centres) and positively with indus (proportion of non-retail business acres per town), which is quite expected since pollution (like nitrogen oxides) is likely to be highest in the industrial areas, which also likely represent many of the employment centers.
+
+### 4.3 Scaling the dataset
+
+Next, to standardize the dataset, we will scale the values, i.e., subtract the column means from the corresponding columns and divide the difference with standard deviation.
+
+```{r}
+# centering and standardizing variables
+boston_scaled <- as.data.frame(scale(Boston))
+
+# summarizing the scaled variables
+summary(boston_scaled)
+```
+
+By scaling, we have essentially centered the values around 0, so the mean of each variable is now 0. Next, we will create a categorical variable of the crime rate, generating 4 classes based on quantile values: low, intermediate low, intermediate high and high.
+
+```{r}
+# determining the quantiles of the crim (crime rate per capita) variables
+quants <- quantile(boston_scaled$crim)
+# creating a categorical variable called 'crime'
+crime <- cut(boston_scaled$crim, breaks = quants, include.lowest = TRUE, label=c("low", "med_low", "med_high", "high"))
+# and checking the crime variable distribution
+table(crime)
+# then removing original crim from the dataset
+boston_scaled <- dplyr::select(boston_scaled, -crim)
+# and adding the new categorical value to scaled data
+boston_scaled <- data.frame(boston_scaled, crime)
+```
+
+### 4.4 Train and test sets
+
+Next, we are determining the train and test sets for linear discriminant analysis, so that 80% of observations are in the train set and 20% in the test set.
+
+```{r}
+# dividing the data into train and test sets
+set.seed(14)
+
+# 80% allocated to the train set
+train <- sample(nrow(boston_scaled), round(0.8*506))
+# and the rest, 20% to the test set
+test <- setdiff(1:nrow(boston_scaled), train)
+
+# creating tables with only the train and test sets
+train <- boston_scaled[train,]
+test <- boston_scaled[test,]
+
+```
+
+### 4.5 Linear discriminant analysis
+
+Next, we are fitting the linear discriminant model based on the train set, and using it to predict the crime category for the test set.
+
+```{r}
+# conducting the linear discriminant analysis for the train set
+# using crime as the outcome variable and all other variables as the predictor variables
+lda.fit <- lda(crime ~ ., data = train)
+lda.fit
+
+# defining the function for lda biplot arrows
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  graphics::arrows(x0 = 0, y0 = 0, x1 = myscale * heads[,choices[1]], y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), cex = tex, col=color, pos=3)}
+
+# defining target classes as numeric, 1 - low, 4 - high
+classes <- as.numeric(train$crime)
+
+# plotting the lda results
+plot(lda.fit, dimen = 2)
+lda.arrows(lda.fit, myscale = 1)
+
+```
+
+```{r}
+# first determining the correct crime categories of the test set
+correct_cat <- test$crime
+# and removing the variable from the table
+test <- dplyr::select(test, -crime)
+
+# predicting classes of the test data
+lda.pred <- predict(lda.fit, newdata = test)
+
+# cross tabulate the results
+table(correct = correct_cat, predicted = lda.pred$class)
+```
+
+After fitting the model with the train data, and applying it to the test data, we can see that 19+15+13+26=73 categories have been correctly predicted, resulting in a success rate of 73/101=0.72. Most of the wrong predictions are also only 1 category "away" from the correct one, so i.e., one category lower or higher. Only 1 prediction is two categories away from the correct one; the one for which the correct category is low, but prediction is med_high. Therefore, it seems that the model is working relatively well to predict the correct crime category, and if the prediction fails, it is rarely very far from the accurate one. However, regarding the present, relatively small dataset, it can have a high impact on the model which observations are chosen for the train set and test set, and whether the proportions of the different categories represented in both train and test sets represent the actual data well.
+
+### 4.6 K-means clustering
+
+Next, the Boston housing dataset will be reloaded and standardized, and distances between the observations calculated.
+
+```{r}
+# loading in the Bostson data from the MASS dataset
+data("Boston")
+
+# centering and standardizing variables
+boston_scaled <- as.data.frame(scale(Boston))
+
+# creating a distance matrix using the Euclidean distance
+dist_eu <- dist(boston_scaled)
+summary(dist_eu)
+
+# as well as creating a distance matrix using the Manhattan distance
+dist_eu <- dist(boston_scaled, method="manhattan")
+summary(dist_eu)
+
+```
+
+Next, to further study the similarity of the observations, k-means clustering will be conducted. The unsupervised method will assign the observations into clusters based on their similarity.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(14)
+# conducting the k-means clustering, starting with 4 clusters
+km <- kmeans(boston_scaled, centers = 4)
+
+# visualizing the dataset with clusters indicated by colours
+ggpairs(boston_scaled[c("crim", "zn", "indus", "nox", "age", "dis", "rad", "tax", "lstat", "medv")], mapping = aes(col=factor(km$cluster), alpha=0.3), lower = list(combo = wrap("dot", alpha=0.3, size=0.1)), upper=list(continuous=wrap("cor", size=2.1))) + theme(axis.text=element_text(size=5), axis.title = element_text(size=5))
+```
+
+It seems that 4 clusters may be a bit too much since the distributions of the variables by clusters seem to overlap quite notably in many of the plots. Therefore, testing out division to 2 and 3 clusters next.
+
+```{r message=FALSE, warning=FALSE}
+set.seed(14)
+# conducting the k-means clustering with 2 clusters
+km <- kmeans(boston_scaled, centers = 2)
+
+# visualizing the dataset with clusters indicated by colours
+ggpairs(boston_scaled[c("crim", "zn", "indus", "nox", "age", "dis", "rad", "tax", "lstat", "medv")], mapping = aes(col=factor(km$cluster), alpha=0.3), lower = list(combo = wrap("dot", alpha=0.3, size=0.1)), upper=list(continuous=wrap("cor", size=2.1))) + theme(axis.text=element_text(size=5), axis.title = element_text(size=5))
+```
+
+```{r message=FALSE, warning=FALSE}
+set.seed(14)
+# conducting the k-means clustering with 3 clusters
+km <- kmeans(boston_scaled, centers = 3)
+
+# visualizing the dataset with clusters indicated by colours
+ggpairs(boston_scaled[c("crim", "zn", "indus", "nox", "age", "dis", "rad", "tax", "lstat", "medv")], mapping = aes(col=factor(km$cluster), alpha=0.3), lower = list(combo = wrap("dot", alpha=0.3, size=0.1)), upper=list(continuous=wrap("cor", size=2.1))) + theme(axis.text=element_text(size=5), axis.title = element_text(size=5))
+```
+
+Division to 2 clusters seemed to work well regarding some variables, like indus and taxt as there seems to be 2 quite distinct peaks. However, for some variables, the distributions per cluster are quite wide, like lstat and medv, which may indicate that division into 2 clusters might not optimally capture the complexity of the data. When dividing the data into 3 clusters, in turn, the clusters seem to quite nicely be distinguishable from each other regarding many variables, like nox, and e.g., the distributions of medv and lstat are not as wide anymore. Therefore, it seems that 3 clusters may be the best choice out of the different number of clusters.
+
+Looking at the last plot with 3 clusters more closely, we can see that blue cluster seems quite distinct in many aspects, i.e., it seems to have clearly the highest indus (proportion of non-retail business acres per town), nox (nitrogen oxides concentration), rad (index of accessibility to radial highways) and tax (full-value property-tax rate per \$10,000) values on average, while the dis (weighted mean of distances to five Boston employment centres) and medv (median value of owner-occupied homes in \$1000s). All of these observations seem to indicate that these areas cluster together due to many factors that indicate them being more industrial as these suburbs are more likely to e.g., have a lot of industrial buildings, and higher pollution, while they seem to represent the areas closest to the employment centers since the industrial areas likely hold a lot of jobs and access to highways is likely important to the industries too. The high tax rate might also indicate a lot of industrial use of the buildings as there are likely bigger institutions that pay more tax for the bigger properties than the average home owner. Higher crime rates also seem to accumulate to this cluster, likely indicating that the residential areas of these suburbs are inhabited more likely by people with lower education level on average (higher lstat) and likely therefore lower income.
+
+Regarding the other two clusters, they seem to represent less-industrial areas. As the green cluster is resembles the blue one a bit more compared to the red, I would interpret that the green cluster likely represents areas closer to downtown Boston while the red cluster represents more distant suburbs. These clusters do not seem to differ so much in terms of crime rate or tax. However, the red cluster seems to have the highest number of large residental properties by area (zn, proportion of residential land zoned for lots over 25,000 sq.ft), lowest proportion of non-retail business acres per town (indus) on average, lowest nox (nitrogen oxides concentration) and highest dis (weighted mean of distances to five Boston employment centres), all suggesting that the areas are likely further away from the heart of the city. Also, the percentage lower status of the population and the age of the homes seem the lowest in these areas, while the median value of homes seems to be the highest on average, also indicating that perhaps these areas more likely house the upper class since the properties are on average newer and bigger and owned by people more highly educated. The green cluster, in turn, seems to be the 'middle one' so likely represents on average the non-industrial suburbs closer to downtown Boston, with e.g., pollution higher compared to the red cluster yet lower compared to the blue one, but on average with smaller distance to the employment centers (dis) compared to the red cluster.
+
+All in all, these 3 clusters seem to represent well 3 distinct classes of Boston suburbs, and comparing the distributions also allows one to hypothesize about the types of areas these clusters likely represent on average.
+
