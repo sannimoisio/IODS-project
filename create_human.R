@@ -36,9 +36,9 @@ colnames(gii)[3:10] <- c("GII", "Mat.Mor", "Ado.Birth", "Parli.F", "Edu2.F", "Ed
 
 # creating two new variables to gender inequality index gii table
 # first, a ratio of female and male populations with secondary education
-gii <- mutate(gii, Edu2.F_Edu2.M_ratio = Edu2.F/Edu2.M)
+gii <- mutate(gii, Edu2.FM = Edu2.F/Edu2.M)
 # second, a ratio of labor force participation of females and males
-gii <- mutate(gii, Labo.F_Labo.M_ratio = Labo.F/Labo.M)
+gii <- mutate(gii, Labo.FM = Labo.F/Labo.M)
 
 # joining the human development and gender inequality index datasets together
 # using country as the identifier
