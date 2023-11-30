@@ -1,0 +1,123 @@
+# 5. Dimensionality reduction techniques
+
+```{r}
+date()
+```
+
+### Loading necessary R packages
+
+```{r message=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(MASS)
+library(corrplot)
+library(GGally)
+library(tibble)
+library(FactoMineR)
+library(factoextra)
+```
+
+### 5.1 Human development index dataset
+
+```{r}
+# reading in the human development index dataset, which has been processed from the data obtained originally from United Nations Human Development Reports
+human <- read_csv("data/human.csv")
+
+# the first column of the table includes the country, so defining them to be the row names
+human <- column_to_rownames(human, "Country")
+
+# checking the structure
+str(human, show_col_types = FALSE)
+```
+
+There is information for 155 countries in the present dataset, and the columns include 8 different variables related to the human development index, including the ratio of female vs male population with at least secondary education and labour force participation rate (Edu2.FM and Labo.FM, respectively), life expectancy (Life.Exp), expected years of schooling (Edu.Exp), gross national income per capita (GNI), maternal mortality ratio (Mat.Mor), adolecent birth rate (Ado.Birth) and percentange of female representatives in parliament (Parli.F).
+
+### 5.2 Graphical overview of the data
+
+```{r message=FALSE}
+# printing out the data summary
+summary(human)
+
+# printing a graphical overview of the data
+ggpairs(human, lower = list(continuous = wrap("points", alpha = 0.3, size=0.1), combo = wrap("dot", alpha = 0.3, size=0.1)), upper=list(continuous=wrap("cor", size=3))) + theme(axis.text=element_text(size=5), axis.title = element_text(size=5))
+```
+
+Based on the summary and graphical overview of the data, we can observe that the distributions of the variables seem to differ notably. For instance, the only one that seems to somewhat follow a normal distribution is expected years of schooling Edu.Exp, i.e., the value for majority of countries is close to the mean one, and the extremes are expectedly rare. The distributions of ratio of female vs male population with at least secondary education (Edu2.FM) and ratio of female vs male population labour force participation rate (Labo.FM) as well as life expectancy (Life.Exp) seem to be skewed to the left, meaning that majority of observations have medium/high values. Given the general state of the human development, and e.g., improved healthcare in general, it seems intuitive that life expectancy is high in general, with some exceptions in the least developed countries. Furthermore, it seems rational that higher values in the ratios of females vs males with higher education and taking part in the labour force seem to be more prevalent, as more and more countries are trying to improve the gender equality. However, the peak of the education ratio is more distinct which is unsurprising since the female labour force rate is expected to be somewhat lower in general due to pregnancies and maternity leaves also affecting women with higher education. The distributions of gross national income per capita (GNI), maternal mortality ratio (Mat.Mor), adolecent birth rate (Ado.Birth) and percentange of female representatives in parliament (Parli.F) all seem to have some degree of skewness to the right, in turn. Given historical facts like colonization, it is not surprising that the peak of GNI is closer to the lower end of values, while a lower number of highly developed countries represent the tail to the right, with some extremes also visible likely due to oil deposits. Luckily, maternal mortality rates and adolecent birth rates also have more distinct peaks at the lower end of values likely due to improved healthcare efforts and improved education of girls. The percentage of female representatives in parliament, has the highest peak around 15% which is not ideal yet somewhat expected since the higher education of females and participation in the labour force can be quite new improvements in many countries, and the ratio will likely increase with some delay. However, the ratio is usually not 50-50 in the more developed countries either.
+
+```{r}
+# also calculating the correlation matrix
+cor_matrix <- cor(human) 
+# and visualizing it
+corrplot(cor_matrix, method="circle")
+```
+
+The correlations in the graphical overview and the plot above seem quite intuitive, like life expectancy positively correlating with expected years of education and negatively with maternal mortality rates, which has the highest correlation value in the dataset overall. The GNI, in turn, positively correlates with higher life expectancy and years of education, and negatively with maternal mortality and adolecent birth rate. Moreover, the expected years of education and ratio of females vs males with higher education correlate positively as would be expected. Interestingly, the ratio of females vs males taking part in the labour force has minimal correlations with the other factors, correlating positively with percentange of female representatives in parliament yet surprisingly also with maternal mortality rates.
+
+### 5.3 Principal Component Analysis (PCA)
+
+Since the current dataset includes a lot of variables, it might be difficult to interpret as a whole, and therefore utilization of dimensionality reduction techniques may be useful to increase the interpretability while losing minimal information. To this end, principal component analysis (PCA) will be utilized next.
+
+```{r warning=FALSE}
+# performing principal component analysis (with the SVD method)
+pca_human <- prcomp(human)
+
+# drawing a biplot of the principal component representation and the original variables
+biplot(pca_human, choices = 1:2, cex=0.6)
+
+```
+
+Based on the PCA results visualized above, we can observe that it it still quite difficult to interpret the dataset as a whole, since the PC1 seems to be highly affected by GNI only, visualized as the long horizintal arrow (high standard deviation), while the impacts of the other variables are undistinguishable. Qatar is a very extreme outlier regarding GNI, which seems to be the only variable of the dataset this PCA is able to take properly into account and which seems to pretty much solely represent the PC1 component. Therefore, scaling the data prior to PCA might make the analysis more insightful.
+
+```{r}
+# scaling the data
+human_scaled <- scale(human)
+
+# performing principal component analysis on the scaled data (with the SVD method)
+pca_human_scaled <- prcomp(human_scaled)
+
+# drawing a biplot of the principal component representation and the original variables
+biplot(pca_human_scaled, choices = 1:2, cex=0.6)
+
+```
+
+The PCA on the scaled data seems to capture the overall variability a lot better compared to the analysis on the unscaled data since the impact of the extreme GNI of Qatar is now minimized and the other variables are also contributing to the principal components and the principal component contributions also correspond to the previously observed correlations. The results are therefore a lot more insightful, and it seems that all the variables now affect the first two principal components to quite similar degree as the arrows are of fairly similar length. Ratio of female vs male population labour force participation rate (Labo.FM) and percentange of female representatives in parliament (Parli.F) seem to have the highest impact on PC2 and the rest contributing to the PC1 more. Countries with higher ratio of female vs male population labour force participation rate and percentange of female representatives in parliament (Parli.F) locate higher up in the plot, i.e., get higher values in the PC2, and such countries include e.g., Rwanda and Mozambique but also Iceland and Norway, which differ then in their location on the x-axis, i.e., PC1. Countries locating to the lower end of PC2 include Iran and Yemen, which represent countries with likely the most restricted women's rights and independence, and therefore the female contribution in the parliament and labour force is likely minimal as well.
+
+Maternal mortality ratio (Mat.Mor) and adolecent birth rate (Ado.Birth), in turn, seem to have a high impact on PC1, namely that higher the rate, higher the value on PC1. In contrast, ratio of female vs male population with at least secondary education (Edu2.FM), life expectancy (Life.Exp), expected years of schooling (Edu.Exp), and gross national income per capita (GNI) seem to have the opposite effect on PC1. Countries locating towards the lower end of PC1 include Nordic countries and e.g., Australia and Switzerland, which is quite expected since these developed countries have highest education rates, highest incomes, and most comprehensive healthcare systems on average. Qatar, with the clearly highest GNI is also distinguishable in the lower end of PC1, but also locates to the lower end on PC2, i.e., likely has lower fraction of women in parliament and labour force. Countries locating to the higher end of PC1 include e.g., Mosambique, Sierra Leone and Niger, which is unsurprising since these represent less developed countries in terms of education and income, while the healthcare is likely lacking in many aspects also resulting in higher level of maternal mortality.
+
+In general, the more developed countries in terms of education, impact and gender equality seem to locate on average to the higher end of PC2 and lower end of PC1 so the upper left corner of the biplot, also observable from the variables that contribute to each principal component. In addition, the less developed countries seem to be quite variable regarding the participation of women in labour force and parliament, since e.g., Rwanda has more women in parliament and labour force yet the maternal mortality and adolecent birth rate are relatively high, while GNI is relatively low. In contrast, Iran has minimal percentage of women in parliament and low ratio of female vs male population labour force participation rate, while the country does better in terms of maternal mortality rate. Moreover, Qatar has clearly the highest GNI, lower maternal mortality and adolecent birth rates, and on average more women have higher education than men, yet no women are in the parliament.
+
+### 5.4 Multiple Correspondence Analysis (MCA)
+
+To explore dimension reduction in the context of qualitative data, we will next analyze a dataset related to tea consumption with Multiple Correspondence Analysis (MCA).
+
+```{r}
+# reading in the dataset, defining the character variables as factors
+tea <- read.csv("https://raw.githubusercontent.com/KimmoVehkalahti/Helsinki-Open-Data-Science/master/datasets/tea_time.csv", stringsAsFactors = TRUE)
+
+# exploring the dimensions and structure
+str(tea)
+View(tea)
+```
+
+It seems that the current dataset contains information about the preferred tea (Earl Gray/black/green), how the tea is consumed (alone/lemon/milk/other and tea bag/unpackaged/tea bag+unpackaged), does one use sugar in their tea (No.sugar/sugar), where does one purchase the tea from (chain store/chain store+tea shop/tea shop), and whether one has tea with lunch (lunch/Not.lunch). There are in total 300 observations, so 300 people have reported their preferences, and 6 variables as listed.
+
+```{r message=FALSE, warning=FALSE}
+# visualizing the data
+gather(tea) %>% ggplot(aes(value)) + facet_wrap("key", scales = "free") + geom_bar() + theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+Visualizing the data reveals that majority of people prefer Earl Grey tea, a tea bag, and their tea alone and purchased from a chain store. Vast majority reported that they do not drink tea over lunch, while the ratio of sugar vs non-sugar users was almost equal, only a few more people reporting not using sugar with their tea.
+
+```{r}
+# then conducting the multiple correspondence analysis
+mca <- MCA(tea, graph = FALSE)
+
+# plotting the MCA biplot, as well as variable plots
+fviz_mca_biplot(mca, repel = FALSE, ggtheme = theme_minimal(), col.ind = c("powderblue"), col.var=c("tomato3"))
+fviz_mca_var(mca, repel=TRUE, ggtheme=theme_minimal(), col.var = c("tomato3"))
+fviz_mca_var(mca, repel = FALSE, ggtheme = theme_minimal(), choice="mca.cor", col.var = c("tomato3"))
+```
+
+In the biplot above, we can see how the individuals locate on the two-dimensional space and to which variable categories they seem to associate to the most. These variable categories are also plotted solely on the second plot. In particular, it seems that the individuals clustering towards the lower right corner (higher values of Dim1 and lower values of Dim2) would associate with consumption habits of mostly unpackaged tea purchased from a tea shop. The unpackaged and tea shop categories are the furthest from the origin (0,0) so they seem to be the most discriminating variable categories. In general, it seems that with the limited variables and categories in the present data, the more rare answers seem to be the most discriminating, like the present unpackaged and tea shop answers both reported by less than 40 people. In addition, only 9 people report the "Other" category to the question "How" (other options: alone/milk/lemon), yet the category still locates relatively far from the origin. Moreover, it seems that the individuals in the upper right corner associate with answers reporting the consumption of both tea bags and unpackaged tea purchased from both chain stores and tea shops, while individuals consuming mostly tea bags purchased from chain stores locate mostly towards the lower left corner. Based on these observations combined with the variables plot, we can deduce that the answers to the where (where one usually purchases tea, chain store/chain store+tea shop/tea shop) and how (tea bag/tea bag+unpackaged/unpackaged) questions seem to be the most discriminating, the answers to the other questions having quite minimal impact on the dimensions.

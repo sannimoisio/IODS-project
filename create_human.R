@@ -1,4 +1,5 @@
 # created by Sanni Moisio 17.11.2023
+# modified 27.11.2023 to add further processing steps
 # this script will prepare data for dimensionality reduction task (assignment 5)
 
 # setting the working directory to the IODS course project data folder
@@ -46,3 +47,47 @@ human <- inner_join(hd, gii, by = "Country")
 
 # writing the created data out
 write_csv(human, "human.csv")
+
+# reading in the human development index data again
+human <- read_csv("human.csv")
+
+# checking the dimensions and structure
+dim(human)
+str(human)
+colnames(human)
+
+# the dataset contains 195 observations (rows) and 19 variables (columns)
+# variables include "HDI Rank", "Country", "HDI", "Life.Exp", "Edu.Exp", "Edu.Mean", "GNI", "GNI.Rank-HDI.Rank",
+# "GII Rank","GII", "Mat.Mor", "Ado.Birth", "Parli.F", "Edu2.F", "Edu2.M", "Labo.F", "Labo.M", "Edu2.FM", and "Labo.FM"
+
+# Indeed, each row in the data corresponds to a Country/region, and the countries have been ranked according to human development index (HDI)
+# which is based on three dimensions:
+# long and healthy life, the indicator of which is life expectancy at birth (Life.Exp column)
+# knowledge, the indicators of which are expected and mean years of schooling (Edu.Exp and Edu.Mean columns, respectively)
+# and a decent standard of living, the indicator of which is gross national income (GNI) per capita (GNI column).
+# The relationship between the GNI and HDI rank can also be studied based on the GNI.Rank-HDI.Rank column as it describes their difference.
+
+# Moreover, information about the countries' gender inequality index (GII) has also been included in the table including the GII Rank column
+# which index is based on different dimensions as well, namely:
+# health, the indicators of which are maternal mortality ratio (Mat.Mor) and adolecent birth rate (Ado.Birth)
+# empowerment, the indicators of which are female and male shares of parlamentry seats (percentange of female representatives in parliament, Parli.F reported here)
+# and female and male population with at least secondary education (Edu2.F and Edu2.M columns, respectively)
+# as well as labour market, the indicators of which are female and male labour force participation rates (Labo.F and Labo.M columns, respectively).
+# The ratio of female vs male population with at least secondary education and labour force participation rates can be studied based on the Edu2.FM and Labo.FM columns, respectively.
+
+# then only keeping countries and removing regions, which have HDI and GII values but are not included in the rank
+human <- subset(human, !is.na(human$`HDI Rank`))
+
+# then keeping only the following columns of interest
+cols <- c("Country", "Edu2.FM", "Labo.FM", "Life.Exp", "Edu.Exp", "GNI", "Mat.Mor", "Ado.Birth", "Parli.F")
+human <- human[,cols]
+
+# removing all rows with missing values
+human2 <- filter(human, complete.cases(human))
+
+# checking the dimensions
+dim(human2)
+# the current data has 155 observations (=rows) and 9 variables (columns) as desired
+
+# writing the updated human dataset out, overwriting the previous one
+write_csv(human2, "human.csv")
