@@ -1,0 +1,237 @@
+# 6. Analysis of longitudinal data
+
+```{r}
+date()
+```
+
+### Loading necessary R packages
+
+```{r message=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(MASS)
+library(corrplot)
+library(GGally)
+library(tibble)
+library(FactoMineR)
+library(factoextra)
+library(lme4)
+```
+
+### 6.1 Dataset of weight development of rats on different diets
+
+```{r}
+# reading in the required dataset
+rats <- read.table("data/rats.txt", header=T)
+# checking the structure
+str(rats)
+# changing categorical variables, id, group, and wd to factors, and checking structure again
+rats$id <- factor(rats$id)
+rats$group <- factor(rats$group)
+rats$wd <- factor(rats$wd)
+str(rats)
+```
+The current dataset aims to compare the effects of 3 different diets (= groups) on the weight development of 16 rats in total (id). The weight was measured at 11 different timepoints over 9 weeks (wd & time), and each weight measurement from each timepoint is reported on their own row in the weight column while the corresponding rat id, diet group of the rat, and the timepoint are also reported for each weight measurement. Since each measurement is reported on their own row, the data is in the long format. Next, to get an initial idea of the weight development in the different dietary groups, the values will be visualized.
+
+### 6.2 Visualizing longitudinal data
+
+```{r}
+# plotting the development of each of the rats' weights over the study period
+ggplot(rats, aes(x = time, y = weight, linetype=id, col=group)) +geom_line() + scale_linetype_manual(values = rep(1:10, times=4)) + theme(legend.position = "none") + scale_y_continuous(limits = c(min(rats$weight), max(rats$weight))) + facet_grid(. ~ group, labeller = label_both) + xlab("time (days)")
+```
+
+```{r}
+# also plotting the weight development using standardized values
+# to get a better idea on how the values in the beginning affect the weight development, i.e., the tracking phenomenon
+# standardizing the wight variable
+rats <- rats %>% group_by(time) %>% mutate(stdweight = (weight-mean(weight))/sd(weight)) %>% ungroup()
+# plotting the results similarly
+ggplot(rats, aes(x = time, y = stdweight, linetype=id, col=group)) +geom_line() + scale_linetype_manual(values = rep(1:10, times=4)) + theme(legend.position = "none") + facet_grid(. ~ group, labeller = label_both) + xlab("time (days)") + ylab("scaled weight")
+```
+
+From the plot describing not standardized data, we can distinguish the general trends of weight development among the 3 different dietary groups. Rats in group 1 seem to weigh the least to begin with, and weight gain seems quite minimal on average in that group over the study period. Some weight gain can be distinguished on average for rats in both groups 2 and 3, in turn, while the starting weight for rats in group 3 seems on average the highest, yet there seems to be a significant outlier in group 2 in terms of weight in the beginning of the study period. Plotting the standardized data, in turn, yields some further insight into the tracking phenomenon, i.e., how the weight in the beginning associates with the weight measures at later timepoints. However, although we get a general idea on how the different diets seem ro associate with weight, drawing concrete conclusions on weight development solely based on these plots is not ideal since there is some variability among the rats also belonging to the same dietary group. Therefore, some plots describing mean values between the groups as well as statistical tests would be in place.
+
+### 6.2 Summary graphs and outlier detection
+
+```{r message=FALSE}
+# generating summary data with mean and standard error of weight by diet group and timepoint 
+rats2 <- rats %>% group_by(group, time) %>% summarise( mean = mean(weight), se = (sd(weight)/sqrt(length(weight)))) %>% ungroup()
+
+# plotting the mean profiles by group
+ggplot(rats2, aes(x = time, y = mean, linetype = group, shape = group, col=group)) + geom_line() + scale_linetype_manual(values = c(1,2,3)) + geom_point(size=3) + scale_shape_manual(values = c(1,2,3)) + geom_errorbar(aes(ymin=mean-se, ymax=mean+se, linetype="1"), width=0.3) + scale_y_continuous(name = "mean(weight) +/- se(weight)") + scale_x_continuous(name = "time (days)")
+
+```
+
+Comparison of the groups is more intuitive from the plot above, as we can now see the general trends better. Rats in group 1 indeed weigh the least to begin with and the weight development seems to be very moderate, on average only about 25 grams. Also, it seems that there is quite minimal variability among that group. Rats in group 2, in turn, seem to weigh on average more than rats in group 2 and less than rats in group 3 at the start, but it seems that their weight gain is the most notable during the study period, seemingly about 70 grams over the study period on average. However, the variability in this group seems to be the highest, likely due to the outlier noticed also in the previous plots. Rats in group 3 seem to weigh the most in the beginning, and the variability in this group seems quite moderate, and weight gain seems to be less than 50 grams on average. However, due to the variability in group 2, it is quite difficult to still draw any conrete conclusions and it might make sense to take a closer look at the outlier, so therefore a boxplot will be generated next.
+
+```{r message = FALSE}
+# creating summary data by diet group and subject with mean as the summary variable (ignoring baseline timepoint 1)
+rats3 <- rats %>% filter(time > 1) %>% group_by(group, id) %>% summarise(mean=mean(weight)) %>% ungroup()
+ggplot(rats3, aes(x = group, y = mean, col=group)) + geom_boxplot() + stat_summary(fun = "mean", geom = "point", shape=23, size=2.5, fill = "white") + scale_y_continuous(name = "mean(weight), days 8-64")
+```
+
+As noted previously, one rat in group 2 seems to be quite a distinct outlier which is also visible in the boxplot above. Therefore, removing that rat from the dataset next and generating the boxplot again without it.
+
+```{r}
+# removing the outlier
+rats4 <- subset(rats3, rats3$mean<550)
+
+# replotting the boxplot
+ggplot(rats4, aes(x = group, y = mean, col=group)) + geom_boxplot() + stat_summary(fun = "mean", geom = "point", shape=23, size=2.5, fill = "white") + scale_y_continuous(name = "mean(weight), days 8-64")
+```
+
+After removing the outlier, the variability in group 2 seems to have reduced notably and the difference to group 3 seems more distinct. However, even though the outlier was removed at this point, it is good to keep in mind that group 2 had only 4 rats in total, so making any concrete conclusions based on this study alone might be quite difficult, as in reality exploring whether the 'rat' here was truly an outlier would require a larger sample size, and its removal would be more justifiable then.
+
+### 6.3 T-test to evaluate diet group differences and fitting a linear model
+
+Next, to get some idea whether the differences between the diet groups in terms of mean weight reach statistical significance, a t-test will be performed.
+
+```{r warning = FALSE}
+# performing t-tests to compare mean weight values between the different dietary groups
+# comparing group 1 vs 2 first
+rats5 <- subset(rats4, rats4$group==1 | rats4$group==2)
+t.test(mean ~ group, data = rats5, var.equal=TRUE)
+# comparing group 1 vs 3 then
+rats5 <- subset(rats4, rats4$group==1 | rats4$group==3)
+t.test(mean ~ group, data = rats5, var.equal=TRUE)
+# and finally group 2 vs 3
+rats5 <- subset(rats4, rats4$group==2 | rats4$group==3)
+t.test(mean ~ group, data = rats5, var.equal=TRUE)
+# then also comparing the groups 2 and 3 if the outlier is not removed
+rats5 <- subset(rats3, rats3$group==2 | rats4$group==3)
+t.test(mean ~ group, data = rats5, var.equal=TRUE)
+```
+Based on the summaries above, we can observe that the mean weight difference seems to be significant when comparing group 1 to either group 2 or 3 as the p-values are very small for these comparisons. There also seems to be a significant difference between groups 2 and 3 as the p-value is about 0.002. However, it is good to keep in mind that the outlier from group 2 was removed, and if that would be included in the comparison, the p-value is quite high at 0.44. Therefore, it seems to affect the results quite notably, and it should be further studied whether removing the rat from the comparison is justifiable, i.e., would it stay as an outlier if more rats would be included in the study.
+
+Next, to evaluate how well could we estimate the mean weight knowing the dietary group and baseline weight, a linear model will be fitted and analysis of variance table for the fitted model computed. Now the outlier will be included
+
+```{r}
+# adding the baseline values to the table from the original data
+baseline <- subset(rats, rats$time==1)
+rats5 <- rats3 %>% mutate(baseline = baseline$weight)
+
+# fitting the linear model with the mean as the response 
+fit <- lm(mean ~ baseline + group, data = rats5)
+
+# computing the analysis of variance table for the fitted model
+anova(fit)
+```
+Based on the anova result above, we can distinguish that baseline weight seems to be the stronger predictor of the later mean weight compared to the dietary group, which is not very surprising given that the weight in the beginning was quite distinct between the different dietary groups. The group seems to have some impact, however, but it doesn't seem to be statistically significant as the p-value is around 0.076 so it is thus quite difficult to say if the differences between the groups might just arise at random. Therefore, to get a more definitive answer about how the different diets impact weight development, it might be a good idea to repeat the experiment with rats with similar baseline weight and in addition to scrutinize the longitudinal trends of weight development and correlations between timepoints in more detail, not just by taking the mean weight from later timepoints into account.
+
+### 6.4 BPRS dataset
+
+```{r}
+# reading in the required dataset
+bprs <- read.table("data/bprs.txt", header=T)
+# checking the structure
+str(bprs)
+
+# since there are actually 40 subjects, but the same subject ids are used for the subjects on different treatments
+# fixing it so each patient has a unique subject id
+bprs$subject <- 1:40
+
+# changing categorical variables, id, group, and wd to factors, and checking structure again
+bprs$treatment <- factor(bprs$treatment)
+bprs$subject <- factor(bprs$subject)
+bprs$weeks <- factor(bprs$weeks)
+str(bprs)
+```
+The current dataset aims to compare the effects of 2 different treatments on the brief psychiatric rating scale (bprs) values of 40 male subjects. The bprs was measured before starting the treatment (week 0) and then once a week for 8 subsequent weeks, and each bprs measurement from each timepoint is reported on their own row in the bprs column while the corresponding subject ID, treatment group, and the timepoint (week) are also reported for each bprs measurement. Since each measurement is reported on their own row, the data is in the long format. Next, to get an initial idea of the bprs development in the different treatment groups, the values will be visualized.
+
+### 6.5 Visualizing longitudinal data
+
+```{r warning = FALSE, message = FALSE}
+# plotting the bprs data
+ggplot(bprs, aes(x = week, y = bprs, linetype=subject, colour=treatment)) + geom_line(alpha=0.5) + scale_linetype_manual(values = rep(1:10, times=40), guide=FALSE) + guides(colour = guide_legend(override.aes= list(alpha = 1)))
+
+```
+
+Based on the plot above, it is relatively difficult to distinguish if there are any differences between the different treatment groups in terms of bprs development. However, in contrast to the rat weight dataset, it seems that the different treatment arms are not so distict based on the bprs value in the beginning of the experiment, which should allow for a more insightful evaluation of the impacts of the treatment. 
+
+### 6.6 Fitting a linear regression model on the BPRS dataset
+
+Next, to study how different models would work for the bprs dataset, a linear regression model will be fitted first, using the week and treatment variables as explanatory ones for the bprs score.
+
+```{r}
+# creating a regression model
+bprs_lm <- lm(bprs ~ week + treatment, data = bprs)
+
+# printing out a summary of the model
+summary(bprs_lm)
+```
+In the summary above, we can see that the time variable (measured in weeks) seems to be the only one significantly associated with the bprs values while the association of treatment seems minimal. However, the linear regression model assumes that each measurement is independent of each other, which most likely is not the case here since there are several measurements from the same individual. Therefore subsequently, several models better suited for longitudinal data, i.e., linear mixed effects models will be explored and results evaluated, as these models are designed to include parameters which would associate the explanatory variables to the repeated measurements and ones that take into account the most likely correlations of the repeated measurements of the response variable.
+
+### 6.7 Linear mixed effects models
+
+#### 6.7.1 The random intercept model
+
+First, a random intercept model will be fitted which allows for the linear regression fit for each subject to differ in terms of intercept from the other subjects.
+
+```{r}
+# creating a random intercept model
+bprs_ref <- lmer(bprs ~ week + treatment + (1 | subject), data = bprs, REML = FALSE)
+
+# printing the summary of the model
+summary(bprs_ref)
+```
+
+#### 6.7.2 Random intercept and random slope model
+
+Next, a random intercept and random slope model will be fitted which allows for the linear regression fit for each subject to differ in terms of intercept and slope from the other subjects. Hence it can account for the interindividual differences in the bprs measurements and the effect of time on them.
+
+```{r}
+# create a random intercept and random slope model
+bprs_ref1 <- lmer(bprs ~ week + treatment + (week | subject), data = bprs, REML = FALSE)
+
+# print a summary of the model
+summary(bprs_ref1)
+```
+#### 6.7.3 Random intercept and random slope model with interaction
+
+Finally, a random intercept and random slope model will be fitted which allows for the which allows also for treatment x time (week) interaction.
+
+```{r message = FALSE}
+# createing a random intercept and random slope model with the interaction
+bprs_ref2 <- lmer(bprs ~ week + treatment + (week | subject) + (week | treatment), data = bprs, REML = FALSE)
+
+# printing a summary of the model
+summary(bprs_ref2)
+```
+
+#### 6.7.3 Comparing the different models using anova
+
+Next, to compare which of the models performed best, we can use anova analysis.
+
+```{r}
+# performing an anova test on the first two models
+# random intercept model vs random intercept and random slope model
+anova(bprs_ref, bprs_ref1)
+```
+
+Based on the output, we can observe that allowing the random slope in the second model seemed to significantly improve the model compared to the first one, since the p-value is very significant at 1.499e-14.
+
+```{r}
+# performing an anova test on the last two models
+# random intercept and random slope model vs random intercept and random slope model with interaction
+anova(bprs_ref1, bprs_ref2)
+```
+Based on the output, we can observe that allowing treatment x time (week) interaction did not seem to improve the model compared to the second one, since the p-value is 1 so any observed difference is most likely arising just randomly. Therefore, we will stick to model 2 (bprs_ref1) and plot both the observed values and the values that the model predicts to allow for a more insigtful comparison.
+
+```{r}
+# drawing the plot of bprs with the observed bprs values
+ggplot(bprs, aes(x = week, y = bprs, linetype=subject, colour=treatment)) + geom_line(alpha=0.5) + scale_linetype_manual(values = rep(1:10, times=40), guide=FALSE) + guides(colour = guide_legend(override.aes= list(alpha = 1)))
+
+# creating a vector of the fitted values
+fitted <- fitted(bprs_ref1)
+
+# creating a new column fitted to bprs
+bprs <- mutate(bprs, fitted=fitted)
+
+# drawing the plot of bprs with the fitted bprs values
+ggplot(bprs, aes(x = week, y = fitted, linetype=subject, colour=treatment)) + geom_line(alpha=0.5) + scale_linetype_manual(values = rep(1:10, times=40), guide=FALSE) + guides(colour = guide_legend(override.aes= list(alpha = 1)))
+
+```
+
+Based on the estimated regression parameters for the interaction in the printed summary for the chosen model (bprs_ref1) indicates that slopes for subjects in treatment group 2 are on average 1.5139 higher compared to treatment group 1 but the standard error is quite high at 3.1392. Looking at the plots, we can see that the bprs values predicted by the model seem to reduce on average at a faster rate for patients receiving treatment 2, although this type of a difference is not so easily distinguished from the plot describing the actually observed values. So even though the values predicted by the model seem very simplified compared to the observed ones (since on average the bprs measurements reduce by time so therefore the slopes are constant in the predicted data and do not capture the "up and down" nature of some longitudinal observations) it still enables one to make some more insightful comparisons of the 2 groups and might e.g., allow some scientists to focus their research on the more promising treatment that was not so distinct at first.
