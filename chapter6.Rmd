@@ -105,7 +105,7 @@ t.test(mean ~ group, data = rats5, var.equal=TRUE)
 ```
 Based on the summaries above, we can observe that the mean weight difference seems to be significant when comparing group 1 to either group 2 or 3 as the p-values are very small for these comparisons. There also seems to be a significant difference between groups 2 and 3 as the p-value is about 0.002. However, it is good to keep in mind that the outlier from group 2 was removed, and if that would be included in the comparison, the p-value is quite high at 0.44. Therefore, it seems to affect the results quite notably, and it should be further studied whether removing the rat from the comparison is justifiable, i.e., would it stay as an outlier if more rats would be included in the study.
 
-Next, to evaluate how well could we estimate the mean weight knowing the dietary group and baseline weight, a linear model will be fitted and analysis of variance table for the fitted model computed. Now the outlier will be included
+Next, to evaluate how well could we estimate the mean weight knowing the dietary group and baseline weight, a linear model will be fitted and analysis of variance table for the fitted model computed. Now the outlier will be included.
 
 ```{r}
 # adding the baseline values to the table from the original data
